@@ -108,13 +108,14 @@ class JSON
 
         JSON( JSON&& other )
             : Internal( other.Internal )
-            , Type( other.Type )
+            , Type( other.Type ), LineSeperator(other.LineSeperator)
         { other.Type = Class::Null; other.Internal.Map = nullptr; }
 
         JSON& operator=( JSON&& other ) {
             ClearInternal();
             Internal = other.Internal;
             Type = other.Type;
+            LineSeperator = other.LineSeperator;
             other.Internal.Map = nullptr;
             other.Type = Class::Null;
             return *this;
@@ -140,6 +141,7 @@ class JSON
                 Internal = other.Internal;
             }
             Type = other.Type;
+            LineSeperator = other.LineSeperator;
         }
 
         JSON& operator=( const JSON &other ) {
@@ -163,6 +165,7 @@ class JSON
                 Internal = other.Internal;
             }
             Type = other.Type;
+            LineSeperator = other.LineSeperator;
             return *this;
         }
 
@@ -182,18 +185,18 @@ class JSON
         }
 
         template <typename T>
-        JSON( T b, typename enable_if<is_same<T,bool>::value>::type* = 0 ) : Internal( b ), Type( Class::Boolean ){}
+        JSON( T b, typename enable_if<is_same<T,bool>::value>::type* = 0 ) : Internal( b ), Type( Class::Boolean ), LineSeperator( false ) {}
 
         template <typename T>
-        JSON( T i, typename enable_if<is_integral<T>::value && !is_same<T,bool>::value>::type* = 0 ) : Internal( (long)i ), Type( Class::Integral ){}
+        JSON( T i, typename enable_if<is_integral<T>::value && !is_same<T,bool>::value>::type* = 0 ) : Internal( (long)i ), Type( Class::Integral ), LineSeperator( false ) {}
 
         template <typename T>
-        JSON( T f, typename enable_if<is_floating_point<T>::value>::type* = 0 ) : Internal( (double)f ), Type( Class::Floating ){}
+        JSON( T f, typename enable_if<is_floating_point<T>::value>::type* = 0 ) : Internal( (double)f ), Type( Class::Floating ), LineSeperator(false) {}
 
         template <typename T>
-        JSON( T s, typename enable_if<is_convertible<T,string>::value>::type* = 0 ) : Internal( string( s ) ), Type( Class::String ){}
+        JSON( T s, typename enable_if<is_convertible<T,string>::value>::type* = 0 ) : Internal( string( s ) ), Type( Class::String ), LineSeperator(false) {}
 
-        JSON( std::nullptr_t ) : Internal(), Type( Class::Null ){}
+        JSON( std::nullptr_t ) : Internal(), Type( Class::Null ), LineSeperator(false) {}
 
         static JSON Make( Class type ) {
             JSON ret; ret.SetType( type );
@@ -282,6 +285,10 @@ class JSON
 
         Class JSONType() const { return Type; }
 
+        bool HasSeperateLine() const { return LineSeperator; }
+        
+        void SetLineSeperator(bool lineSeperator) { LineSeperator = lineSeperator; }
+
         /// Functions for getting primitives from the JSON object.
         bool IsNull() const { return Type == Class::Null; }
 
@@ -342,25 +349,27 @@ class JSON
                 case Class::Null:
                     return "null";
                 case Class::Object: {
-                    string s = "{\n";
+                    string s = LineSeperator ? "{\n" + pad: "{";
                     bool skip = true;
                     for( auto &p : *Internal.Map ) {
-                        if( !skip ) s += ",\n";
-                        s += ( pad + "\"" + p.first + "\" : " + p.second.dump( depth + 1, tab ) );
+                        if ( !skip )
+                            s += LineSeperator ? ",\n" + pad: ", ";
+                        s += ( "\"" + p.first + "\" : " + p.second.dump( depth + 1, tab ) );
                         skip = false;
                     }
-                    s += ( "\n" + pad.erase( 0, 2 ) + "}" ) ;
+                    s += LineSeperator ? "\n" + pad.erase(0, 2) + "}" : "}";
                     return s;
                 }
                 case Class::Array: {
-                    string s = "[";
+                    string s = LineSeperator ? "[\n" + pad : "[";
                     bool skip = true;
                     for( auto &p : *Internal.List ) {
-                        if( !skip ) s += ", ";
+                        if( !skip )
+                            s += LineSeperator ? ",\n" + pad: ", ";
                         s += p.dump( depth + 1, tab );
                         skip = false;
                     }
-                    s += "]";
+                    s += LineSeperator ? "\n"+ pad.erase(0, 2) + "]" : "]";
                     return s;
                 }
                 case Class::String:
@@ -384,12 +393,13 @@ class JSON
             if( type == Type )
                 return;
 
+            LineSeperator = true;
             ClearInternal();
           
             switch( type ) {
             case Class::Null:      Internal.Map    = nullptr;                break;
             case Class::Object:    Internal.Map    = new map<string,JSON>(); break;
-            case Class::Array:     Internal.List   = new deque<JSON>();     break;
+            case Class::Array:     Internal.List   = new deque<JSON>();      LineSeperator = false;      break;
             case Class::String:    Internal.String = new string();           break;
             case Class::Floating:  Internal.Float  = 0.0;                    break;
             case Class::Integral:  Internal.Int    = 0;                      break;
@@ -416,6 +426,7 @@ class JSON
     private:
 
         Class Type = Class::Null;
+        bool LineSeperator;      // true: seperate objects in the container by a new line
 };
 
 JSON Array() {
@@ -441,8 +452,13 @@ std::ostream& operator<<( std::ostream &os, const JSON &json ) {
 namespace {
     JSON parse_next( const string &, size_t & );
 
-    void consume_ws( const string &str, size_t &offset ) {
-        while( isspace( str[offset] ) ) ++offset;
+    bool consume_ws( const string &str, size_t &offset ) {
+        bool lineSeperator = false;  // are object in the array seperated by a new line?
+        while( isspace( str[offset] ) ) {
+            lineSeperator |= str[offset] == '\n';
+            ++offset;
+        }
+        return lineSeperator;
     }
 
     JSON parse_object( const string &str, size_t &offset ) {
@@ -484,6 +500,7 @@ namespace {
     JSON parse_array( const string &str, size_t &offset ) {
         JSON Array = JSON::Make( JSON::Class::Array );
         unsigned index = 0;
+        bool lineSeperator = false;
         
         ++offset;
         consume_ws( str, offset );
@@ -493,7 +510,7 @@ namespace {
 
         while( true ) {
             Array[index++] = parse_next( str, offset );
-            consume_ws( str, offset );
+            lineSeperator |= consume_ws( str, offset );
 
             if( str[offset] == ',' ) {
                 ++offset; continue;
@@ -507,6 +524,7 @@ namespace {
             }
         }
 
+        Array.SetLineSeperator(lineSeperator);
         return std::move( Array );
     }
 
