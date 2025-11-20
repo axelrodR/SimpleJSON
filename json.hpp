@@ -264,7 +264,7 @@ class JSON
 
         int length() const {
             if( Type == Class::Array )
-                return Internal.List->size();
+                return (int)Internal.List->size();
             else
                 return -1;
         }
@@ -277,9 +277,9 @@ class JSON
 
         int size() const {
             if( Type == Class::Object )
-                return Internal.Map->size();
+                return (int)Internal.Map->size();
             else if( Type == Class::Array )
-                return Internal.List->size();
+                return (int)Internal.List->size();
             else
                 return -1;
         }
@@ -597,8 +597,9 @@ namespace {
                 break;
         }
         if( c == 'E' || c == 'e' ) {
-            c = str[ offset++ ];
+            c = str[ offset ];
             if( c == '-' ){ ++offset; exp_str += '-';}
+            if (c == '+') { ++offset; }
             while( true ) {
                 c = str[ offset++ ];
                 if( c >= '0' && c <= '9' )
