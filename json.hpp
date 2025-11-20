@@ -96,7 +96,7 @@ class JSON
                 typename Container::const_iterator end() const { return object ? object->end() : typename Container::const_iterator(); }
         };
 
-        JSON() : Internal(), Type( Class::Null ){}
+        JSON() : Internal(), Type( Class::Null ), LineSeparator( true ) {}
 
         JSON( initializer_list<JSON> list ) 
             : JSON() 
@@ -104,18 +104,19 @@ class JSON
             SetType( Class::Object );
             for( auto i = list.begin(), e = list.end(); i != e; ++i, ++i )
                 operator[]( i->ToString() ) = *std::next( i );
+            LineSeparator = true;
         }
 
         JSON( JSON&& other )
             : Internal( other.Internal )
-            , Type( other.Type ), LineSeperator(other.LineSeperator)
+            , Type( other.Type ), LineSeparator(other.LineSeparator)
         { other.Type = Class::Null; other.Internal.Map = nullptr; }
 
         JSON& operator=( JSON&& other ) {
             ClearInternal();
             Internal = other.Internal;
             Type = other.Type;
-            LineSeperator = other.LineSeperator;
+            LineSeparator = other.LineSeparator;
             other.Internal.Map = nullptr;
             other.Type = Class::Null;
             return *this;
@@ -141,7 +142,7 @@ class JSON
                 Internal = other.Internal;
             }
             Type = other.Type;
-            LineSeperator = other.LineSeperator;
+            LineSeparator = other.LineSeparator;
         }
 
         JSON& operator=( const JSON &other ) {
@@ -165,7 +166,7 @@ class JSON
                 Internal = other.Internal;
             }
             Type = other.Type;
-            LineSeperator = other.LineSeperator;
+            LineSeparator = other.LineSeparator;
             return *this;
         }
 
@@ -185,18 +186,18 @@ class JSON
         }
 
         template <typename T>
-        JSON( T b, typename enable_if<is_same<T,bool>::value>::type* = 0 ) : Internal( b ), Type( Class::Boolean ), LineSeperator( false ) {}
+        JSON( T b, typename enable_if<is_same<T,bool>::value>::type* = 0 ) : Internal( b ), Type( Class::Boolean ), LineSeparator( true ) {}
 
         template <typename T>
-        JSON( T i, typename enable_if<is_integral<T>::value && !is_same<T,bool>::value>::type* = 0 ) : Internal( (long)i ), Type( Class::Integral ), LineSeperator( false ) {}
+        JSON( T i, typename enable_if<is_integral<T>::value && !is_same<T,bool>::value>::type* = 0 ) : Internal( (long)i ), Type( Class::Integral ), LineSeparator( true ) {}
 
         template <typename T>
-        JSON( T f, typename enable_if<is_floating_point<T>::value>::type* = 0 ) : Internal( (double)f ), Type( Class::Floating ), LineSeperator(false) {}
+        JSON( T f, typename enable_if<is_floating_point<T>::value>::type* = 0 ) : Internal( (double)f ), Type( Class::Floating ), LineSeparator(true) {}
 
         template <typename T>
-        JSON( T s, typename enable_if<is_convertible<T,string>::value>::type* = 0 ) : Internal( string( s ) ), Type( Class::String ), LineSeperator(false) {}
+        JSON( T s, typename enable_if<is_convertible<T,string>::value>::type* = 0 ) : Internal( string( s ) ), Type( Class::String ), LineSeparator(true) {}
 
-        JSON( std::nullptr_t ) : Internal(), Type( Class::Null ), LineSeperator(false) {}
+        JSON( std::nullptr_t ) : Internal(), Type( Class::Null ), LineSeparator(true) {}
 
         static JSON Make( Class type ) {
             JSON ret; ret.SetType( type );
@@ -285,9 +286,9 @@ class JSON
 
         Class JSONType() const { return Type; }
 
-        bool HasSeperateLine() const { return LineSeperator; }
+        bool HasSeperateLine() const { return LineSeparator; }
         
-        void SetLineSeperator(bool lineSeperator) { LineSeperator = lineSeperator; }
+        void SetLineSeperator(bool lineSeperator) { LineSeparator = lineSeperator; }
 
         /// Functions for getting primitives from the JSON object.
         bool IsNull() const { return Type == Class::Null; }
@@ -349,27 +350,27 @@ class JSON
                 case Class::Null:
                     return "null";
                 case Class::Object: {
-                    string s = LineSeperator ? "{\n" + pad: "{";
+                    string s = LineSeparator ? "{\n" + pad: "{";
                     bool skip = true;
                     for( auto &p : *Internal.Map ) {
                         if ( !skip )
-                            s += LineSeperator ? ",\n" + pad: ", ";
+                            s += LineSeparator ? ",\n" + pad: ", ";
                         s += ( "\"" + p.first + "\" : " + p.second.dump( depth + 1, tab ) );
                         skip = false;
                     }
-                    s += LineSeperator ? "\n" + pad.erase(0, 2) + "}" : "}";
+                    s += LineSeparator ? "\n" + pad.erase(0, 2) + "}" : "}";
                     return s;
                 }
                 case Class::Array: {
-                    string s = LineSeperator ? "[\n" + pad : "[";
+                    string s = LineSeparator ? "[\n" + pad : "[";
                     bool skip = true;
                     for( auto &p : *Internal.List ) {
                         if( !skip )
-                            s += LineSeperator ? ",\n" + pad: ", ";
+                            s += LineSeparator ? ",\n" + pad: ", ";
                         s += p.dump( depth + 1, tab );
                         skip = false;
                     }
-                    s += LineSeperator ? "\n"+ pad.erase(0, 2) + "]" : "]";
+                    s += LineSeparator ? "\n"+ pad.erase(0, 2) + "]" : "]";
                     return s;
                 }
                 case Class::String:
@@ -393,13 +394,13 @@ class JSON
             if( type == Type )
                 return;
 
-            LineSeperator = true;
+            LineSeparator = true;
             ClearInternal();
           
             switch( type ) {
             case Class::Null:      Internal.Map    = nullptr;                break;
             case Class::Object:    Internal.Map    = new map<string,JSON>(); break;
-            case Class::Array:     Internal.List   = new deque<JSON>();      LineSeperator = false;      break;
+            case Class::Array:     Internal.List   = new deque<JSON>();      break;
             case Class::String:    Internal.String = new string();           break;
             case Class::Floating:  Internal.Float  = 0.0;                    break;
             case Class::Integral:  Internal.Int    = 0;                      break;
@@ -426,7 +427,7 @@ class JSON
     private:
 
         Class Type = Class::Null;
-        bool LineSeperator;      // true: seperate objects in the container by a new line
+        bool LineSeparator = false;      // true: seperate objects in the container by a new line
 };
 
 JSON Array() {

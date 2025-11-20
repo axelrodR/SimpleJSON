@@ -17,10 +17,10 @@ for x in inputs:
         actual = json.loads( output )
 
         if not (expected == actual):
-            print 'Error: Failed', x
-            print 'Expected:', expected
-            print 'Actual:', actual
+            print('Error: Failed', x)
+            print('Expected:', expected)
+            print('Actual:', actual)
         else:
-            print x,'passed.'
+            print(x,'passed.')
     except:
-        print 'Error: Failed', x, '- Subprocess failed'
+        print('Error: Failed', x, '- Subprocess failed')
