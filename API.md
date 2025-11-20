@@ -119,7 +119,13 @@ namespace json {
         /// Get the JSON::Class type for a JSON object.
         JSON::Class JSONType();
 
-        /// Convience method to determine if an object is Class::Null
+        /// Get whether to use line-breaks between sub-objects when dumping (relevant to an Array). 
+        bool HasSeperateLine() const { return LineSeparator; }
+        
+        /// Set whether to use line-breaks between sub-objects when dumping (relevant to an Array).  
+        void SetLineSeperator(bool lineSeperator) { LineSeparator = lineSeperator; }
+
+        /// Convenience method to determine if an object is Class::Null
         bool IsNull();
 
         /// Convert to a string literal iff Type == Class::String
@@ -143,11 +149,11 @@ namespace json {
         */
 
         /// Wraps the internal object representation to access iterators.
-        /// Will return empty range for non-object objects.
+        /// Will return an empty range for non-object objects.
         JSONWrapper ObjectRange();
 
         /// Wraps the internal array representation to access iterators.
-        /// Will return empty range for non-array objects.
+        /// Will return an empty range for non-array objects.
         JSONWrapper ArrayRange();
     }; // End json::JSON documentation
 } // End json documentation
