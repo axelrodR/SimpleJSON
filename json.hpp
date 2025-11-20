@@ -55,7 +55,7 @@ class JSON
         map<string,JSON>   *Map;
         string             *String;
         double              Float;
-        long                Int;
+        long long           Int;
         bool                Bool;
     } Internal;
 
@@ -301,12 +301,24 @@ class JSON
 
         double ToFloat() const { bool b; return ToFloat( b ); }
         double ToFloat( bool &ok ) const {
-            ok = (Type == Class::Floating);
-            return ok ? Internal.Float : 0.0;
+			ok = true;
+			if (Type == Class::Floating)
+				return Internal.Float;
+			else if (Type == Class::Integral)
+				return (double)Internal.Int;
+
+			ok = false;
+			return 0;
         }
 
         long ToInt() const { bool b; return ToInt( b ); }
         long ToInt( bool &ok ) const {
+            ok = (Type == Class::Integral);
+            return ok ? (long)Internal.Int : 0;
+        }
+
+        long long ToInt64() const { bool b; return ToInt64(b); }
+        long long ToInt64(bool& ok) const {
             ok = (Type == Class::Integral);
             return ok ? Internal.Int : 0;
         }
